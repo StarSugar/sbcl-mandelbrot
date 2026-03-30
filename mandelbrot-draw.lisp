@@ -1,6 +1,6 @@
 (defpackage :mandelbrot-draw
   (:use :cl :mandelbrot)
-  (:export *width* *height* *maxiter* show dump-png))
+  (:export *width* *height* *maxiter* draw show dump-png))
 
 (in-package :mandelbrot-draw)
 
@@ -61,6 +61,17 @@
 (defun iter-map (&optional (width *width*) (height *height*) (maxiter *maxiter*))
   (declare (type (unsigned-byte 32) width height maxiter))
   (iter-map* width height maxiter))
+
+(defun draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+  (let ((map (iter-map width height maxiter))
+        (result-map (make-array (list height width))))
+    (dotimes (x width)
+      (dotimes (y height)
+        (let ((pos (+ x (* y width))))
+          (setf (aref result-map y x)
+                (multiple-value-list
+                 (iter->rgb (round (aref map pos)) maxiter))))))
+    result-map))
 
 (defun show (&optional (width *width*) (height *height*) (maxiter *maxiter*))
   "Open SDL2 window displaying Mandelbrot set."
