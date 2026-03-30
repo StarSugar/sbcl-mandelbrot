@@ -63,6 +63,7 @@
   (iter-map* width height maxiter))
 
 (defun draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+  "Generate a rgb list 2D array of Mandelbrot set"
   (let ((map (iter-map width height maxiter))
         (result-map (make-array (list height width))))
     (dotimes (x width)
