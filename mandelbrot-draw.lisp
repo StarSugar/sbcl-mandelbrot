@@ -66,8 +66,8 @@
   "Generate a rgb list 2D array of Mandelbrot set"
   (let ((map (iter-map width height maxiter))
         (result-map (make-array (list height width))))
-    (dotimes (x width)
-      (dotimes (y height)
+    (dotimes (y height)
+      (dotimes (x width)
         (let ((pos (+ x (* y width))))
           (setf (aref result-map y x)
                 (multiple-value-list
@@ -104,8 +104,8 @@
       (let ((image (make-array (list height width)
                     :element-type 'imago:rgb-pixel
                     :initial-element (imago:make-color 0 255 255))))
-        (dotimes (x width)
-          (dotimes (y height)
+        (dotimes (y height)
+          (dotimes (x width)
             (let ((pos (+ x (* y width))))
               (setf (aref image y x)
                     (multiple-value-call #'imago:make-color
