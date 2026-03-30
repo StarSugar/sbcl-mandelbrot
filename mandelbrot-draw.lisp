@@ -1,11 +1,14 @@
 (defpackage :mandelbrot-draw
   (:use :cl :mandelbrot)
-  (:export draw))
+  (:export *width* *height* *maxiter* draw* draw show dump-png))
 
 (in-package :mandelbrot-draw)
 
-(ql:quickload "sdl2")
+(eval-when (:compile-toplevel :execute :load-toplevel)
+  (ql:quickload "sdl2")
+  (ql:quickload "imago"))
 
+(eval-when (:execute :compile-toplevel)
 (defmacro with-window-renderer
     ((window renderer)
      (&key
@@ -21,7 +24,7 @@
                         :h ,screen-height
                         :flags ,window-flags)
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
-         ,@body))))
+         ,@body)))))
 
 (defparameter *height* 400)
 (defparameter *width* 400)
@@ -39,11 +42,12 @@
         (values (calc phase-r) (calc phase-g) (calc phase-b))))))
 
 (defun draw* (width height maxiter)
-  (declare (optimize (speed 3)))
+  (declare (optimize (speed 3) (debug 0) (safety 0))
+           (type (unsigned-byte 32) width height maxiter))
   (let* ((map-x (make-array (* width height) :element-type 'single-float))
          (map-y (make-array (* width height) :element-type 'single-float))
-         (width-scaling (* 2.0 (/ width (max width height))))
-         (height-scaling (* 2.0 (/ height (max width height))))
+         (width-scaling (* 2.0 (/ (float width 1.0) (max width height))))
+         (height-scaling (* 2.0 (/ (float height 1.0) (max width height))))
          (half-width (/ width 2.0))
          (half-height (/ height 2.0)))
     (dotimes (x width)
@@ -51,24 +55,51 @@
         (let ((pos (+ x (* y width))))
           (setf (aref map-x pos) (* width-scaling (/ (- x half-width) half-width)))
           (setf (aref map-y pos) (* height-scaling (/ (- y half-height) half-height))))))
-    (let ((res (time (z->z^2+c map-x map-y maxiter))))
-      (with-window-renderer (window renderer)
-          (:title "mandelbrot" :screen-width width :screen-height height)
+    (z->z^2+c map-x map-y maxiter)))
+
+(declaim (inline draw))
+(defun draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+  (declare (type (unsigned-byte 32) width height maxiter))
+  (draw* width height maxiter))
+
+(define-compiler-macro draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+  (draw* (the (unsigned-byte 32) width)
+         (the (unsigned-byte 32) height)
+         (the (unsigned-byte 32) maxiter)))
+
+(defun show (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+  (sdl2:make-this-thread-main
+   (lambda ()
+     (let ((map (draw width height maxiter)))
+       (with-window-renderer (window renderer)
+           (:title "mandelbrot" :screen-width width :screen-height height)
+         (dotimes (x width)
+           (dotimes (y height)
+             (sdl2:with-rects ((fill-rect x y 1 1))
+               (multiple-value-call #'sdl2:set-render-draw-color
+                 renderer
+                 (let ((pos (+ x (* y width))))
+                   (iter->rgb (round (aref map pos)) maxiter))
+                 0)
+               (sdl2:render-fill-rect renderer fill-rect))))
+         (sdl2:render-present renderer)
+         (block exit
+           (loop
+            (sdl2:with-event-loop (:method :poll)
+              (:quit () (return-from exit t))))))))))
+
+(defun dump-png (name &optional (width *width*) (height *height*) (maxiter *maxiter*))
+  (imago:write-png
+   (imago:make-rgb-image-from-pixels
+    (let ((map (draw width height maxiter)))
+      (let ((image (make-array (list height width)
+                    :element-type 'imago:rgb-pixel
+                    :initial-element (imago:make-color 0 255 255))))
         (dotimes (x width)
           (dotimes (y height)
-            (sdl2:with-rects ((fill-rect x y 1 1))
-              (multiple-value-call #'sdl2:set-render-draw-color
-                renderer
-                (let ((pos (+ x (* y width))))
-                  (iter->rgb (round (aref res pos)) maxiter))
-                0)
-              (sdl2:render-fill-rect renderer fill-rect))))
-        (sdl2:render-present renderer)
-        (block exit
-          (loop
-           (sdl2:with-event-loop (:method :poll)
-             (:quit () (return-from exit t)))))))))
-
-(defun draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
-  (sdl2:make-this-thread-main
-   (lambda () (draw* width height maxiter))))
+            (let ((pos (+ x (* y width))))
+              (setf (aref image y x)
+                    (multiple-value-call #'imago:make-color
+                      (iter->rgb (round (aref map pos)) maxiter))))))
+        image)))
+   name))
