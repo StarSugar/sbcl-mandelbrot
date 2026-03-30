@@ -1,6 +1,6 @@
 (defpackage :mandelbrot-draw
   (:use :cl :mandelbrot)
-  (:export *width* *height* *maxiter* draw* draw show dump-png))
+  (:export *width* *height* *maxiter* show dump-png))
 
 (in-package :mandelbrot-draw)
 
@@ -26,9 +26,9 @@
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
          ,@body)))))
 
-(defparameter *height* 400)
-(defparameter *width* 400)
-(defparameter *maxiter* 1000)
+(defparameter *height* 400 "default height")
+(defparameter *width* 400 "default width")
+(defparameter *maxiter* 1000 "default max iteration times")
 
 (defun iter->rgb (iter maxiter)
   (declare (type (unsigned-byte 32) iter maxiter))
@@ -62,12 +62,8 @@
   (declare (type (unsigned-byte 32) width height maxiter))
   (draw* width height maxiter))
 
-(define-compiler-macro draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
-  (draw* (the (unsigned-byte 32) width)
-         (the (unsigned-byte 32) height)
-         (the (unsigned-byte 32) maxiter)))
-
 (defun show (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+  "Open SDL2 window displaying Mandelbrot set."
   (sdl2:make-this-thread-main
    (lambda ()
      (let ((map (draw width height maxiter)))
@@ -89,6 +85,7 @@
               (:quit () (return-from exit t))))))))))
 
 (defun dump-png (name &optional (width *width*) (height *height*) (maxiter *maxiter*))
+  "Write Mandelbrot set to PNG file NAME."
   (imago:write-png
    (imago:make-rgb-image-from-pixels
     (let ((map (draw width height maxiter)))
