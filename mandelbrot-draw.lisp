@@ -34,14 +34,14 @@
   (declare (type (unsigned-byte 32) iter maxiter))
   (declare (optimize (speed 3)))
   (when (>= iter maxiter)
-    (return-from iter->rgb (list 0 0 0)))
+    (return-from iter->rgb (values 0 0 0)))
   (let ((freq 0.1) (phase-r 0) (phase-g 2) (phase-b 4))
     (let ((time (* iter freq)))
       (labels ((calc (phase) (round (* 255 0.5 (1+ (sin (+ time phase)))))))
         (declare (inline calc))
-        (list (calc phase-r) (calc phase-g) (calc phase-b))))))
+        (values (calc phase-r) (calc phase-g) (calc phase-b))))))
 
-(defun draw* (width height maxiter)
+(defun iter-map* (width height maxiter)
   (declare (optimize (speed 3) (debug 0) (safety 0))
            (type (unsigned-byte 32) width height maxiter))
   (let* ((map-x (make-array (* width height) :element-type 'single-float))
@@ -55,20 +55,18 @@
         (let ((pos (+ x (* y width))))
           (setf (aref map-x pos) (* width-scaling (/ (- x half-width) half-width)))
           (setf (aref map-y pos) (* height-scaling (/ (- y half-height) half-height))))))
-    (map 'simple-vector
-         (lambda (iter) (iter->rgb (round iter) maxiter))
-         (z->z^2+c map-x map-y maxiter))))
+    (z->z^2+c map-x map-y maxiter)))
 
-(declaim (inline draw))
-(defun draw (&optional (width *width*) (height *height*) (maxiter *maxiter*))
+(declaim (inline iter-map))
+(defun iter-map (&optional (width *width*) (height *height*) (maxiter *maxiter*))
   (declare (type (unsigned-byte 32) width height maxiter))
-  (draw* width height maxiter))
+  (iter-map* width height maxiter))
 
 (defun show (&optional (width *width*) (height *height*) (maxiter *maxiter*))
   "Open SDL2 window displaying Mandelbrot set."
   (sdl2:make-this-thread-main
    (lambda ()
-     (let ((map (draw width height maxiter)))
+     (let ((map (iter-map width height maxiter)))
        (with-window-renderer (window renderer)
            (:title "mandelbrot" :screen-width width :screen-height height)
          (dotimes (x width)
@@ -77,7 +75,7 @@
                (multiple-value-call #'sdl2:set-render-draw-color
                  renderer
                  (let ((pos (+ x (* y width))))
-                   (values-list (aref map pos)))
+                   (iter->rgb (round (aref map pos)) maxiter))
                  0)
                (sdl2:render-fill-rect renderer fill-rect))))
          (sdl2:render-present renderer)
@@ -90,7 +88,7 @@
   "Write Mandelbrot set to PNG file NAME."
   (imago:write-png
    (imago:make-rgb-image-from-pixels
-    (let ((map (draw width height maxiter)))
+    (let ((map (iter-map width height maxiter)))
       (let ((image (make-array (list height width)
                     :element-type 'imago:rgb-pixel
                     :initial-element (imago:make-color 0 255 255))))
@@ -98,6 +96,7 @@
           (dotimes (y height)
             (let ((pos (+ x (* y width))))
               (setf (aref image y x)
-                    (apply #'imago:make-color (aref map pos))))))
+                    (multiple-value-call #'imago:make-color
+                      (iter->rgb (round (aref map pos)) maxiter))))))
         image)))
    name))
