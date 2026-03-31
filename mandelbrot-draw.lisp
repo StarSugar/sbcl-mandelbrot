@@ -31,9 +31,10 @@
 (defparameter *maxiter* 1000 "default max iteration times")
 
 (defun iter->rgb (iter maxiter)
-  (declare (type (unsigned-byte 32) iter maxiter))
+  (declare (type (unsigned-byte 32) maxiter)
+           (type single-float iter))
   (declare (optimize (speed 3)))
-  (when (>= iter maxiter)
+  (when (>= (round iter) maxiter)
     (return-from iter->rgb (values 0 0 0)))
   (let ((freq 0.1) (phase-r 0) (phase-g 2) (phase-b 4))
     (let ((time (* iter freq)))
@@ -71,7 +72,7 @@
         (let ((pos (+ x (* y width))))
           (setf (aref result-map y x)
                 (multiple-value-list
-                 (iter->rgb (round (aref map pos)) maxiter))))))
+                 (iter->rgb (aref map pos) maxiter))))))
     result-map))
 
 (defun show (&optional (width *width*) (height *height*) (maxiter *maxiter*))
@@ -87,7 +88,7 @@
                (multiple-value-call #'sdl2:set-render-draw-color
                  renderer
                  (let ((pos (+ x (* y width))))
-                   (iter->rgb (round (aref map pos)) maxiter))
+                   (iter->rgb (aref map pos) maxiter))
                  0)
                (sdl2:render-fill-rect renderer fill-rect))))
          (sdl2:render-present renderer)
@@ -109,6 +110,6 @@
             (let ((pos (+ x (* y width))))
               (setf (aref image y x)
                     (multiple-value-call #'imago:make-color
-                      (iter->rgb (round (aref map pos)) maxiter))))))
+                      (iter->rgb (aref map pos) maxiter))))))
         image)))
    name))
